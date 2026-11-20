@@ -1,14 +1,16 @@
-import pygame  
+import pygame
 import random
 import math
 from datetime import datetime
 
-# 1. Colores
+# ==========================================
+# 1. CONFIGURACIÓN GENERAL Y COLORES
+# ==========================================
 COLS = 92       # Ancho del acuario en caracteres
 ROWS = 32       # Alto del acuario en caracteres
 FPS = 60
 
-# Paleta de colores (R, G, B) inspirada en la referencia
+# Paleta de colores (R, G, B)
 COLOR_FONDO = (6, 10, 18)
 COLOR_MARCO = (45, 95, 130)
 COLOR_OLA_1 = (70, 170, 220)
@@ -25,26 +27,39 @@ COLORES_ALGAS = {
 }
 
 COLORES_PECES = {
-    0: [(60, 85, 110), (75, 95, 105)],                        # Fondo: tonos apagados
-    1: [(90, 165, 215), (180, 110, 185), (195, 145, 80)],     # Medio: tonos intermedios
-    2: [(255, 115, 75), (90, 235, 145), (255, 85, 100), (255, 215, 80)]  # Frente: neón
+    0: [(60, 85, 110), (75, 95, 105)],                                      # Fondo: tonos apagados
+    1: [(90, 165, 215), (180, 110, 185), (195, 145, 80), (110, 190, 170)],  # Medio: tonos intermedios
+    2: [(255, 115, 75), (90, 235, 145), (255, 85, 100), (255, 215, 80)]     # Frente: neón
 }
 
 
+# ==========================================
 # 2. CLASES DEL ACUARIO (ENTIDADES)
+# ==========================================
 class Pez:
     def __init__(self, capa):
         self.capa = capa  # 0: Fondo, 1: Medio, 2: Primer plano
         
         # Sprites (izquierda, derecha) según la profundidad
         if capa == 0:
-            self.sprite_izq, self.sprite_der = random.choice([("<><", "><>"), ("<°><", "><°>")])
+            self.sprite_izq, self.sprite_der = random.choice([
+                ("<><", "><>"),
+                ("<°><", "><°>")
+            ])
             self.vel_base = random.uniform(3.0, 5.5)
         elif capa == 1:
-            self.sprite_izq, self.sprite_der = random.choice([("<===<", ">===>"), ("<°))><", "><((°>")])
+            self.sprite_izq, self.sprite_der = random.choice([
+                ("<°))><", "><((°>"),
+                ("<°)))><", "><(((°>")
+            ])
             self.vel_base = random.uniform(5.5, 8.5)
         else:
-            self.sprite_izq, self.sprite_der = random.choice([("<°)))><", "><(((°>"), ("<*(((><", "><)))*>"), ("<°)))><>", "<><(((°>")])
+            self.sprite_izq, self.sprite_der = random.choice([
+                ("<°)))><", "><(((°>"),
+                ("<°)))><", "><(((°>"),   # Mayor probabilidad para este diseño
+                ("<*(((><", "><)))*>"),
+                ("<°)))><>", "<><(((°>")
+            ])
             self.vel_base = random.uniform(7.5, 11.5)
 
         self.color = random.choice(COLORES_PECES[capa])
@@ -65,21 +80,18 @@ class Pez:
             dist = math.hypot(dx, dy)
 
             if dist > 2.0:
-                # Velocidad deseada hacia el clic (los del fondo reaccionan un poco más lento)
                 factor_profundidad = 0.7 if self.capa == 0 else (1.0 if self.capa == 1 else 1.3)
                 vel_deseada_x = (dx / dist) * (self.vel_base * 1.9 * factor_profundidad)
                 vel_deseada_y = (dy / dist) * (self.vel_base * 1.4 * factor_profundidad)
 
-                # Interpolación suave (steering) para evitar giros bruscos
                 suavizado = 2.8 * dt
                 self.vx += (vel_deseada_x - self.vx) * suavizado
                 self.vy += (vel_deseada_y - self.vy) * suavizado
             else:
-                # Al llegar cerca, frena suavemente y flota alrededor
                 self.vx *= (1 - 2.0 * dt)
                 self.vy += math.sin(tiempo * 3 + self.fase) * 1.5 * dt
         else:
-            # Nado libre natural (crucero horizontal + ligero vaivén vertical)
+            # Nado libre natural
             dir_actual = 1 if self.mirando_der else -1
             vel_objetivo_x = self.vel_base * dir_actual
             vel_objetivo_y = math.sin(tiempo * 1.5 + self.fase) * 1.2
@@ -120,31 +132,6 @@ class Pez:
         dibujar_ascii(pantalla, fuente, int(round(self.x)), int(round(self.y)), sprite, self.color, char_w, char_h)
 
 
-class Medusa:
-    def __init__(self):
-        self.x = random.uniform(10, COLS - 10)
-        self.y = random.uniform(6, ROWS - 10)
-        self.fase = random.uniform(0, math.pi * 2)
-        self.color_cabeza = (225, 115, 195)
-        self.color_tentaculos = (145, 75, 170)
-
-    def actualizar(self, dt, tiempo):
-        # Impulso rítmico hacia arriba y caída suave
-        pulso = math.sin(tiempo * 2.2 + self.fase)
-        self.y -= pulso * 1.8 * dt
-        self.x += math.cos(tiempo * 0.6 + self.fase) * 0.8 * dt
-
-        # Mantener dentro del agua
-        self.y = max(5, min(ROWS - 8, self.y))
-        self.x = max(4, min(COLS - 8, self.x))
-
-    def dibujar(self, pantalla, fuente, char_w, char_h, tiempo):
-        gx, gy = int(round(self.x)), int(round(self.y))
-        tentaculos = "|||" if math.sin(tiempo * 4 + self.fase) > 0 else "| |"
-        dibujar_ascii(pantalla, fuente, gx, gy, "(^)", self.color_cabeza, char_w, char_h)
-        dibujar_ascii(pantalla, fuente, gx, gy + 1, tentaculos, self.color_tentaculos, char_w, char_h)
-
-
 class Burbuja:
     def __init__(self, x=None, y=None):
         self.reiniciar(x, y)
@@ -162,7 +149,6 @@ class Burbuja:
             self.reiniciar()
 
     def dibujar(self, pantalla, fuente, char_w, char_h):
-        # Cambia de tamaño al subir
         if self.y > ROWS - 10:
             simbolo = "."
         elif self.y > 10:
@@ -185,7 +171,6 @@ class Alga:
         base_y = ROWS - 3
         for i in range(self.altura):
             y = base_y - i
-            # Movimiento ondulante progresivo (más fuerte en la punta)
             onda = math.sin(tiempo * 2.0 + self.fase + i * 0.6)
             desplazamiento = int(round(onda * (i / self.altura) * 1.2))
             
@@ -205,7 +190,7 @@ class OndaClic:
     def __init__(self, x, y):
         self.x = x
         self.y = y
-        self.vida = 1.0  
+        self.vida = 1.0
 
     def actualizar(self, dt):
         self.vida -= dt * 1.4
@@ -220,7 +205,9 @@ class OndaClic:
             dibujar_ascii(pantalla, fuente, gx - 2, gy, "(   )", COLOR_OLA_2, char_w, char_h)
 
 
+# ==========================================
 # 3. FUNCIONES AUXILIARES DE DIBUJO
+# ==========================================
 def dibujar_ascii(pantalla, fuente, col, row, texto, color, char_w, char_h):
     if 0 <= row < ROWS:
         superficie = fuente.render(texto, True, color)
@@ -234,7 +221,7 @@ def dibujar_escenario(pantalla, fuente, char_w, char_h, tiempo, total_peces):
         dibujar_ascii(pantalla, fuente, 0, r, "|", COLOR_MARCO, char_w, char_h)
         dibujar_ascii(pantalla, fuente, COLS - 1, r, "|", COLOR_MARCO, char_w, char_h)
 
-    # 2. Olas animadas en la superficie (filas 1 y 2)
+    # 2. Olas animadas en la superficie
     ola_sup = ""
     ola_inf = ""
     for c in range(1, COLS - 1):
@@ -245,7 +232,7 @@ def dibujar_escenario(pantalla, fuente, char_w, char_h, tiempo, total_peces):
     dibujar_ascii(pantalla, fuente, 1, 1, ola_sup, COLOR_OLA_1, char_w, char_h)
     dibujar_ascii(pantalla, fuente, 1, 2, ola_inf, COLOR_OLA_2, char_w, char_h)
 
-    # 3. Arena en el fondo (fila ROWS - 2)
+    # 3. Arena en el fondo
     patron_arena = "._.-._..-_."
     arena = (patron_arena * (COLS // len(patron_arena) + 1))[:COLS - 2]
     dibujar_ascii(pantalla, fuente, 1, ROWS - 2, arena, COLOR_ARENA, char_w, char_h)
@@ -257,11 +244,12 @@ def dibujar_escenario(pantalla, fuente, char_w, char_h, tiempo, total_peces):
     dibujar_ascii(pantalla, fuente, 0, ROWS - 1, hud, COLOR_HUD, char_w, char_h)
 
 
+# ==========================================
 # 4. BUCLE PRINCIPAL DEL PROGRAMA
+# ==========================================
 def main():
     pygame.init()
     
-    # Fuente monoespaciada (esencial para que el arte ASCII quede alineado)
     fuente = pygame.font.SysFont("consolas,couriernew,dejavusansmono,monospace", 18, bold=True)
     char_w, char_h = fuente.size("M")
 
@@ -269,13 +257,12 @@ def main():
     pygame.display.set_caption("Acuario ASCII Interactivo")
     reloj = pygame.time.Clock()
 
-    # Crear entidades distribuidas por capas
+    # Crear peces distribuidos por capas (16 peces en total)
     peces = (
         [Pez(capa=0) for _ in range(4)] +   # 4 peces lejanos
-        [Pez(capa=1) for _ in range(4)] +   # 4 peces intermedios
-        [Pez(capa=2) for _ in range(4)]     # 4 peces en primer plano
+        [Pez(capa=1) for _ in range(5)] +   # 5 peces intermedios
+        [Pez(capa=2) for _ in range(7)]     # 7 peces en primer plano (estilo <°)))><)
     )
-    medusas = [Medusa() for _ in range(2)]
     burbujas = [Burbuja() for _ in range(14)]
     plancton = [(random.randint(3, COLS - 4), random.randint(4, ROWS - 5)) for _ in range(18)]
 
@@ -289,7 +276,7 @@ def main():
 
     ejecutando = True
     while ejecutando:
-        dt = min(reloj.tick(FPS) / 1000.0, 0.05)  # Delta time seguro
+        dt = min(reloj.tick(FPS) / 1000.0, 0.05)
         tiempo_total += dt
 
         # --- Eventos (Teclado y Ratón) ---
@@ -301,12 +288,10 @@ def main():
                 gx = max(3, min(COLS - 4, mx / char_w))
                 gy = max(4, min(ROWS - 5, my / char_h))
                 objetivo_clic = (gx, gy)
-                tiempo_objetivo = 4.5  # Los peces seguirán el clic durante 4.5 segundos
+                tiempo_objetivo = 4.5
                 ondas.append(OndaClic(gx, gy))
-                # Generar un par de burbujas en el lugar del clic
                 burbujas.append(Burbuja(gx, gy))
 
-        # Reducir temporizador del clic
         if tiempo_objetivo > 0:
             tiempo_objetivo -= dt
             if tiempo_objetivo <= 0:
@@ -315,25 +300,21 @@ def main():
         # --- Actualizar lógica ---
         for pez in peces:
             pez.actualizar(dt, tiempo_total, objetivo_clic)
-        for medusa in medusas:
-            medusa.actualizar(dt, tiempo_total)
         for burbuja in burbujas:
             burbuja.actualizar(dt, tiempo_total)
         for onda in ondas[:]:
             onda.actualizar(dt)
             if onda.vida <= 0:
                 ondas.remove(onda)
-        # Mantener un límite sano de burbujas extra
         if len(burbujas) > 22:
             burbujas.pop(0)
 
-        # --- Dibujado por CAPAS (Algoritmo del pintor) ---
+        # --- Dibujado por CAPAS ---
         pantalla.fill(COLOR_FONDO)
 
-        # Escenario base (marco, olas, arena, HUD)
-        dibujar_escenario(pantalla, fuente, char_w, char_h, tiempo_total, len(peces) + len(medusas))
+        dibujar_escenario(pantalla, fuente, char_w, char_h, tiempo_total, len(peces))
 
-        # CAPA 0: Fondo (plancton, algas oscuras, peces pequeños/lentos)
+        # CAPA 0: Fondo
         for px, py in plancton:
             dibujar_ascii(pantalla, fuente, px, py, ".", (30, 50, 75), char_w, char_h)
         for alga in algas_fondo:
@@ -342,18 +323,16 @@ def main():
             if pez.capa == 0:
                 pez.dibujar(pantalla, fuente, char_w, char_h)
 
-        # CAPA 1: Intermedia (burbujas, medusas, ondas de clic, peces medianos)
+        # CAPA 1: Intermedia
         for burbuja in burbujas:
             burbuja.dibujar(pantalla, fuente, char_w, char_h)
-        for medusa in medusas:
-            medusa.dibujar(pantalla, fuente, char_w, char_h, tiempo_total)
         for onda in ondas:
             onda.dibujar(pantalla, fuente, char_w, char_h)
         for pez in peces:
             if pez.capa == 1:
                 pez.dibujar(pantalla, fuente, char_w, char_h)
 
-        # CAPA 2: Primer plano (algas brillantes y peces grandes/vivos)
+        # CAPA 2: Primer plano
         for alga in algas_frente:
             alga.dibujar(pantalla, fuente, char_w, char_h, tiempo_total)
         for pez in peces:
